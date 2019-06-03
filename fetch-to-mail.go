@@ -9,10 +9,12 @@ import (
 	gomail "gopkg.in/gomail.v2"
 )
 
-func extractEnv() (smtpHostname, smtpUser, smtpPwd, emailFrom, emailTo, emailSubject string) {
+func extractEnv() (smtpHostname, smtpUser, smtpPwd, headerHost, headerForwardedProto, emailFrom, emailTo, emailSubject string) {
 	smtpHostname = os.Getenv("SMTP_HOSTNAME")
 	smtpUser = os.Getenv("SMTP_USER")
 	smtpPwd = os.Getenv("SMTP_PWD")
+	headerHost = os.Getenv("HEADER_HOST")
+	headerForwardedProto = os.Getenv("HEADER_FWD_PROTO")
 	emailFrom = os.Getenv("EMAIL_FROM")
 	emailTo = os.Getenv("EMAIL_TO")
 	emailSubject = os.Getenv("EMAIL_SUBJECT")
@@ -43,8 +45,21 @@ func extractParams() string {
 	return os.Args[1]
 }
 
-func httpGetBody(url string) string {
-	resp, err := http.Get(url)
+func httpGetBody(url, headerHost, headerForwardedProto string) string {
+
+	client := http.Client{ }
+
+	req, err := http.NewRequest("GET", url, nil)
+
+	if len(headerHost) > 0 {
+		req.Host = headerHost
+	}
+
+	if len(headerForwardedProto) > 0 {
+		req.Header.Add("X-Forwarded-Proto", headerForwardedProto)
+	}
+
+	resp, err := client.Do(req)
 
 	if err != nil {
 		log.Fatalln("Impossible d'accéder à l'url", url, err)
@@ -60,11 +75,11 @@ func httpGetBody(url string) string {
 
 func main() {
 
-	smtpHostname, smtpUser, smtpPwd, emailFrom, emailTo, emailSubject := extractEnv()
+	smtpHostname, smtpUser, smtpPwd, headerHost, headerForwardedProto, emailFrom, emailTo, emailSubject := extractEnv()
 
 	targetFetch := extractParams()
 
-	fetchedResult := httpGetBody(targetFetch)
+	fetchedResult := httpGetBody(targetFetch, headerHost, headerForwardedProto)
 
 	if len(fetchedResult) <= 10 {
 		log.Fatalln("Le résultat du fetch url devrait être plus long", fetchedResult)
